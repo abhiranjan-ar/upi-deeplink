@@ -57,7 +57,7 @@ See `examples/invoice_link.py` for a small end-to-end example.
 python -m unittest discover -s tests -v
 ```
 
-CI runs the suite on every push and pull request across Python 3.9-3.12
+CI runs the suite on every push and pull request across Python 3.10-3.13
 (GitHub Actions).
 
 ## Scope and roadmap
