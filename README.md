@@ -1,7 +1,8 @@
 # upi-deeplink
 
-Build, parse and validate UPI payment deep links (`upi://pay?...`) per the
-NPCI UPI linking specification. Pure Python, zero dependencies.
+Build, parse and validate UPI payment deep links (`upi://pay?...`) following
+the `pay` operation of the NPCI UPI linking specification (v1.6). Pure Python,
+zero dependencies.
 
 UPI apps (Google Pay, PhonePe, Paytm, BHIM, bank apps) respond to these
 links: scanning a QR or opening the URL pre-fills a payment. This library
@@ -47,6 +48,9 @@ python -m unittest discover -s tests -v
 ## Scope and roadmap
 
 - `pay` operation only (request-money `collect` is deprecated in apps)
+- Enforces the spec's mandatory fields (`pa`, `pn`), INR-only currency and
+  decimal amounts; merchant/PSP tags (`orgid`, `mid`, `msid`, `mtid`,
+  `sign`) round-trip through `UpiPayLink.extra` and are never generated
 - Planned: QR payload helpers (`upi://pay` inside Bharat QR), amount
   limits per NPCI circulars, stricter `mode`/`purpose` code tables
 
