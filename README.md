@@ -1,5 +1,7 @@
 # upi-deeplink
 
+[![CI](https://github.com/abhiranjan-ar/upi-deeplink/actions/workflows/ci.yml/badge.svg)](https://github.com/abhiranjan-ar/upi-deeplink/actions/workflows/ci.yml)
+
 Build, parse and validate UPI payment deep links (`upi://pay?...`) following
 the `pay` operation of the NPCI UPI linking specification (v1.6). Pure Python,
 zero dependencies.
@@ -8,6 +10,14 @@ UPI apps (Google Pay, PhonePe, Paytm, BHIM, bank apps) respond to these
 links: scanning a QR or opening the URL pre-fills a payment. This library
 gives backend and tooling code a safe way to generate those links and to
 check links received from elsewhere.
+
+## Why not string formatting
+
+Hand-built links (`f"upi://pay?pa={vpa}&pn={name}"`) silently break on
+unencoded spaces and `&` in payee names, accept malformed VPAs, and let
+amounts like `10.001` or `0` through to a payment app. This library validates
+every field before a link is built or trusted, and refuses links it cannot
+validate.
 
 ## Install
 
@@ -39,11 +49,16 @@ non-INR currencies, missing mandatory fields, duplicate parameters and
 non-`pay` operations. Unknown query parameters round-trip through
 `UpiPayLink.extra` instead of being silently dropped.
 
+See `examples/invoice_link.py` for a small end-to-end example.
+
 ## Run the tests
 
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+CI runs the suite on every push and pull request across Python 3.9-3.12
+(GitHub Actions).
 
 ## Scope and roadmap
 
@@ -56,4 +71,4 @@ python -m unittest discover -s tests -v
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT - see LICENSE.
