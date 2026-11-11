@@ -149,5 +149,48 @@ class TestParsePayLink(unittest.TestCase):
             with self.assertRaises(UpiLinkError, msg=bad):
                 parse_pay_link(bad)
 
+class TestValidationRegressions(unittest.TestCase):
+    def test_extra_cannot_bypass_optional_field_validation(self):
+        for key, value in (("am", "-5"), ("mam", "0"), ("cu", "USD"),
+                           ("tn", "note"), ("mode", "04")):
+            with self.subTest(key=key), self.assertRaises(UpiLinkError):
+                build_pay_link(pa="a@okicici", pn="A", extra={key: value})
+
+    def test_extra_keys_cannot_inject_query_parameters(self):
+        for key in ("Cu", "AM", "x&am", "x=1", "", "x#fragment", "x%26am"):
+            with self.subTest(key=key), self.assertRaises(UpiLinkError):
+                build_pay_link(pa="a@okicici", pn="A", extra={key: "-5"})
+
+    def test_extra_values_must_be_strings(self):
+        for value in (None, 10, True):
+            with self.subTest(value=value), self.assertRaises(UpiLinkError):
+                build_pay_link(pa="a@okicici", pn="A", extra={"xref": value})
+
+    def test_extension_values_are_decoded_exactly_once(self):
+        for value in ("literal%2F", "%26am%3D999", "a+b", "100% done", "A&B=1"):
+            with self.subTest(value=value):
+                link = build_pay_link(pa="a@okicici", pn="A", extra={"xref": value})
+                parsed = parse_pay_link(link)
+                self.assertEqual(parsed.extra["xref"], value)
+                self.assertEqual(parse_pay_link(parsed.to_url()).extra["xref"], value)
+
+    def test_psp_signature_preserved_as_opaque_extra(self):
+        parsed = parse_pay_link("upi://pay?pa=a@okicici&pn=A&sign=abc%2Bdef%2F%3D")
+        self.assertEqual(parsed.extra["sign"], "abc+def/=")
+        self.assertEqual(parse_pay_link(parsed.to_url()).extra["sign"], "abc+def/=")
+
+    def test_amount_rejects_trailing_newline_and_non_ascii_digits(self):
+        for amount in ("10\n", "10\r", "١٠", "１２.５０", 10, None):
+            with self.subTest(amount=amount), self.assertRaises(UpiLinkError):
+                validate_amount(amount)
+
+    def test_vpa_rejects_trailing_newline(self):
+        with self.assertRaises(UpiLinkError):
+            validate_vpa("a@okicici\n")
+
+    def test_whitespace_only_payee_name_rejected(self):
+        with self.assertRaises(UpiLinkError):
+            parse_pay_link("upi://pay?pa=a@okicici&pn=%20%20")
+
 if __name__ == "__main__":
     unittest.main()
