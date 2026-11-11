@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Dict, Optional
-from urllib.parse import quote, unquote, urlsplit, parse_qsl
+from urllib.parse import quote, urlsplit, parse_qsl
 
 UPI_SCHEME = "upi"
 PAY_OPERATION = "pay"
@@ -26,7 +26,7 @@ DEFAULT_CURRENCY = "INR"
 # The local part allows letters, digits, dot, hyphen and underscore.
 _VPA_RE = re.compile(r"^[A-Za-z0-9._-]{1,}@[A-Za-z]{2,}[A-Za-z0-9]*$")
 
-_AMOUNT_RE = re.compile(r"^\d+(\.\d{1,2})?$")
+_AMOUNT_RE = re.compile(r"[0-9]+(\.[0-9]{1,2})?")
 
 # Query keys defined by the NPCI linking spec for the pay operation.
 _KNOWN_KEYS = {
@@ -42,7 +42,6 @@ _KNOWN_KEYS = {
     "url", # bill/invoice URL
     "mode",# mode (e.g. 04 for QR intent)
     "purpose",  # purpose code
-    "sign",# signature (populated by PSP, never hand-built)
 }
 
 
@@ -52,7 +51,7 @@ class UpiLinkError(ValueError):
 
 def validate_vpa(vpa: str) -> str:
     """Return the VPA unchanged if valid, else raise UpiLinkError."""
-    if not isinstance(vpa, str) or not _VPA_RE.match(vpa):
+    if not isinstance(vpa, str) or not _VPA_RE.fullmatch(vpa):
         raise UpiLinkError(
             "invalid payee VPA %r: expected local@handle, e.g. name@okicici" % (vpa,)
         )
@@ -65,7 +64,7 @@ def validate_amount(amount: str) -> str:
     Amounts must be positive and carry at most two decimal places,
     matching how UPI apps render paisa.
     """
-    if not _AMOUNT_RE.match(amount):
+    if not isinstance(amount, str) or not _AMOUNT_RE.fullmatch(amount):
         raise UpiLinkError(
             "invalid amount %r: use up to two decimal places, e.g. '10.00'" % (amount,)
         )
@@ -136,7 +135,7 @@ def build_pay_link(
     Values are URL-encoded per the linking spec; spaces become ``%20``.
     """
     validate_vpa(pa)
-    if not pn or not pn.strip():
+    if not isinstance(pn, str) or not pn.strip():
         raise UpiLinkError("payee name (pn) is mandatory")
     if am is not None:
         validate_amount(am)
@@ -161,8 +160,12 @@ def build_pay_link(
             params[key] = value
     if extra:
         for key, value in extra.items():
-            if key in params:
-                raise UpiLinkError("duplicate parameter %r" % (key,))
+            if not isinstance(key, str) or not re.fullmatch(r"[a-z][a-z0-9_]*", key):
+                raise UpiLinkError("extra parameter keys must be lowercase identifiers")
+            if key in _KNOWN_KEYS:
+                raise UpiLinkError("use the named argument for parameter %r" % (key,))
+            if not isinstance(value, str):
+                raise UpiLinkError("extra parameter %r must have a string value" % (key,))
             params[key] = value
 
     query = "&".join(
@@ -193,7 +196,7 @@ def parse_pay_link(link: str) -> UpiPayLink:
     pn = params.pop("pn", None)
     if not pa:
         raise UpiLinkError("missing mandatory parameter 'pa' (payee VPA)")
-    if not pn:
+    if not pn or not pn.strip():
         raise UpiLinkError("missing mandatory parameter 'pn' (payee name)")
     validate_vpa(pa)
 
@@ -222,5 +225,8 @@ def parse_pay_link(link: str) -> UpiPayLink:
         url=known.get("url"),
         mode=known.get("mode"),
         purpose=known.get("purpose"),
-        extra={k: unquote(v) for k, v in params.items()},
+        # parse_qsl already decoded percent escapes exactly once. Preserve
+        # extension values (including opaque PSP signatures) without decoding
+        # them again or silently discarding them.
+        extra=params,
     )
