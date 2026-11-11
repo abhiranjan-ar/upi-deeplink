@@ -16,8 +16,8 @@ check links received from elsewhere.
 Hand-built links (`f"upi://pay?pa={vpa}&pn={name}"`) silently break on
 unencoded spaces and `&` in payee names, accept malformed VPAs, and let
 amounts like `10.001` or `0` through to a payment app. This library validates
-every field before a link is built or trusted, and refuses links it cannot
-validate.
+the payee VPA, required name, amounts and currency before a link is built.
+It checks structure, not whether a VPA exists or a payment is authentic.
 
 ## Install
 
@@ -48,6 +48,13 @@ Validation rejects malformed VPAs, non-positive or over-precise amounts,
 non-INR currencies, missing mandatory fields, duplicate parameters and
 non-`pay` operations. Unknown query parameters round-trip through
 `UpiPayLink.extra` instead of being silently dropped.
+
+Extension keys must be lowercase identifiers; pass known fields such as `am`
+and `cu` through their named arguments, not `extra`. Extension values are
+strings and are decoded exactly once. Opaque PSP `sign` values are preserved
+in `extra`, but this library does not generate or verify signatures. Rebuilding
+a signed link can change its encoding or parameter order: keep the original
+URI for signature verification. A parsed link is not proof of payment.
 
 See `examples/invoice_link.py` for a small end-to-end example.
 
